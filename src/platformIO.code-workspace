@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "D:/VScode/platformIO"
+		},
+		{
+			"name": "CCD-InverseKinematic",
+			"path": ".."
+		}
+	],
+	"settings": {}
+}

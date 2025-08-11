@@ -17,6 +17,7 @@ class Joint {
         double vectorEndX; // X component of the joint vector end point
         double vectorEndY; // Y component of the joint vector end point
         Servo servo; // Servo controlling the joint
+        Joint *parentJoint; // Pointer to the parent joint, if any
     public:
         Joint(double initialAbsoluteAngle, double length, Servo& servo);
 

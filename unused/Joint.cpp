@@ -26,6 +26,7 @@ Joint::Joint(Joint* parentJoint, double initialRelativeAngleDeg, double length, 
     vectorX = vectorEndX - vectorStartX;
     vectorY = vectorEndY - vectorStartY;
     servo = servo; // Initialize the servo controlling this joint
+    this->parentJoint = parentJoint; // Set the parent joint
 }
 
 double Joint::getAbsoluteAngleDeg() { 

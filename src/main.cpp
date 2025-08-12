@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Servo.h>
-#include <C:\Users\Admin\Desktop\hardware-integrations\header\Vector2D.h>
+#include <Vector2D.h>
 
 // lengths of the robotic arm segments in millimeters
 double l1 = 105; // length of link 1 controled by servo 2

@@ -12,14 +12,9 @@ VLAInput parse_input(String vla_input_str) {
   VLAInput ret;
 
   vla_input_str.trim();
-  try {
-    for (int i=0; i<8; i++) {
-      parse_next(&vla_input_str, tok, &id, (float *)&ret + i);
-    }
-  }
-  catch(std::exception e) {
-    Serial.print(e.what());
-    ret.err = 1;
+
+  for (int i=0; i<8; i++) {
+    parse_next(&vla_input_str, tok, &id, (float *)&ret + i);
   }
 
   return ret;

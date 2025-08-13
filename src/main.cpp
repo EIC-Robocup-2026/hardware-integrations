@@ -11,7 +11,7 @@
 
 // when initializing the servos the arm should be in the upright position with open gripper
 Servo servos[DOF];
-double initializingThetas[] = { 90, 90, 90, 90, 0, 45 }; // initial angles for servos in degrees
+double initializingThetas[] = { 90, 90, 90, 90, 0, 180 }; // initial angles for servos in degrees
 constexpr int servo_pins[] = { 5, 4, 0, 14, 12, 13 }; // pins for servos 1-6
 
 struct Segment segments[N_SEG];

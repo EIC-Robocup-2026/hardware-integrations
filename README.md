@@ -1,4 +1,4 @@
-# Hardware Intetrations
+# Hardware Integrations
 **Hardware Integrations** aims to to make easy to use APIs or ROS topics for all sensors and actuators.
 
 ### TODO

@@ -1,24 +1,24 @@
 #include <Arduino.h>
 #include <Servo.h>
-#include "Vector2D.h"
+#include "..\CCD_arm\include\Vector2D.h"
 
 #define MIN_MICROSEC 500
 #define MAX_MICROSEC 2500
 
 #define VLA_ARM_PROPORTIONAL_GAIN 1     // proportional gain for VLA arm movement input, ADJUSTABLE — based on dx dz
-#define VLA_BASE_ROTATION_GAIN 10       // proportional gain for VLA base rotation input, ADJUSTABLE — based on dy
+#define VLA_BASE_ROTATION_GAIN 1       // proportional gain for VLA base rotation input, ADJUSTABLE — based on dy
 #define VLA_GRIPPER_ROTATION_GAIN 1     // proportional gain for VLA gripper rotation input, ADJUSTABLE — based on roll
-#define CCD_ITERATION 200               // number of iteration for ccd execution
+#define CCD_ITERATION 200              // number of iteration for ccd execution
 
 // lengths of the robotic arm segments in millimeters
 #define l1 105 // length of link 1 controled by servo 2
 #define l2 125 // length of link 2 controled by servo 3
-#define l3 175 // length of link 3 controled by servo 4
+#define l3 170 // length of link 3 controled by servo 4
 
 
 // when initializing the servos the arm should be in the upright position with open gripper
 Servo servos[6];
-int initializingThetas[6] = {90,90,90,90,0,90};
+double currentServoAngle[6] = {90,120,30,20,10,90};
 int attachPin[6] = {5,4,0,14,12,13}; //D1,D2,D3,D5,D6,D7
 
 // Lolin ESP8266 NodeMCU V3
@@ -27,7 +27,7 @@ void setup() {
 
   for (int i = 0; i < 6; i++){
     servos[i].attach(attachPin[i], MIN_MICROSEC , MAX_MICROSEC);
-    servos[i].write(initializingThetas[i]);
+    servos[i].write(currentServoAngle[i]);
   }
 
   delay(5000); // delayed for servos to reach initializing positions
@@ -70,11 +70,9 @@ void loop(){
             Serial.print("yaw: ");Serial.println(yaw);
             
 
-            //measure current servo angle — precalculation
-            double currentServoAngle[6];
+            
 
             for(int i = 0; i < 6; i++){
-                currentServoAngle[i] = servos[i].read();
                 Serial.print("Servo Angle ");Serial.print(i);Serial.print(" : ");Serial.println(currentServoAngle[i]); //print for dubug
             }
 
@@ -87,9 +85,9 @@ void loop(){
             double theta_4_rad = currentServoAngle[3] * M_PI / 180;
 
             //All current link vector calculation before CCD to determine target position
-            Vector2D link1 = Vector2D( -l1*cos(theta_2_rad) , l1*sin(theta_2_rad) );
-            Vector2D link2 = Vector2D( l2*cos( M_PI_2 - theta_2_rad + theta_3_rad) , l2*sin(M_PI/2 - theta_2_rad + theta_3_rad));
-            Vector2D link3 = Vector2D( l3 * cos(theta_4_rad + theta_3_rad - theta_2_rad) , l3 * sin(theta_4_rad + theta_3_rad - theta_2_rad));
+            Vector2D link1 = Vector2D( -l1 * cos(theta_2_rad) , l1 * sin(theta_2_rad) );
+            Vector2D link2 = Vector2D( l2 *cos( 3 * M_PI_2 - theta_3_rad - theta_2_rad) , l2 *sin( 3 * M_PI_2 - theta_3_rad - theta_2_rad));
+            Vector2D link3 = Vector2D( l3 * cos(M_PI + theta_4_rad - theta_3_rad - theta_2_rad), l3 * sin(M_PI + theta_4_rad - theta_3_rad - theta_2_rad));
             Vector2D endEffectorVector = link1.add(link2).add(link3);
 
             //target position in vector form from endEffector
@@ -98,6 +96,7 @@ void loop(){
             Serial.print("Current End Effector Position: ( "); Serial.print(endEffectorVector.x);Serial.print(" , ") ;Serial.print(endEffectorVector.y); Serial.println(" )");
             Serial.print("Target Position: ( "); Serial.print(targetVector.x);Serial.print(" , ") ;Serial.print(targetVector.y); Serial.println(" )");
             Serial.print("Distance from End Effector to Target: ");Serial.println(vectorVLA.getMagnitude());
+
             //CCD initiate from root node 3 and regress to 1 and loop 
             int current_operating_rootNode = 3;
 
@@ -113,12 +112,10 @@ void loop(){
                 theta_3_rad = currentServoAngle[2] * M_PI / 180;
                 theta_4_rad = currentServoAngle[3] * M_PI / 180;
                 
-                link1 = Vector2D( -l1*cos(theta_2_rad) , l1*sin(theta_2_rad) );
-                link2 = Vector2D( l2*cos( M_PI_2 - theta_2_rad + theta_3_rad) , l2*sin(M_PI/2 - theta_2_rad + theta_3_rad));
-                link3 = Vector2D( l3 * cos(theta_4_rad + theta_3_rad - theta_2_rad) , l3 * sin(theta_4_rad + theta_3_rad - theta_2_rad));
+                link1 = Vector2D( -l1 * cos(theta_2_rad) , l1 * sin(theta_2_rad) );
+                link2 = Vector2D( l2 *cos( 3 * M_PI_2 - theta_3_rad - theta_2_rad) , l2 *sin( 3 * M_PI_2 - theta_3_rad - theta_2_rad));
+                link3 = Vector2D( l3 * cos(M_PI + theta_4_rad - theta_3_rad - theta_2_rad), l3 * sin(M_PI + theta_4_rad - theta_3_rad - theta_2_rad));
                 endEffectorVector = link1.add(link2).add(link3);
-
-                
 
                 //vector from joint_i to endEffector
                 Vector2D rootNode_toEndEffector_1 = endEffectorVector;
@@ -140,13 +137,13 @@ void loop(){
                 switch(current_operating_rootNode) {
                     case STATE_1:
                         angle_jointEndEffector_to_jointTargetPoint_1 = rootNode_toEndEffector_1.angleBetweenVector(rootNode_toTargetPoint_1);
-                        currentServoAngle[1] += angle_jointEndEffector_to_jointTargetPoint_1 * 180 / M_PI;
+                        currentServoAngle[1] -= angle_jointEndEffector_to_jointTargetPoint_1 * 180 / M_PI;
                         current_operating_rootNode = STATE_3;
                         break;
                     
                     case STATE_2:
                         angle_jointEndEffector_to_jointTargetPoint_2 = rootNode_toEndEffector_2.angleBetweenVector(rootNode_toTargetPoint_2);
-                        currentServoAngle[2] += angle_jointEndEffector_to_jointTargetPoint_2 * 180 / M_PI;
+                        currentServoAngle[2] -= angle_jointEndEffector_to_jointTargetPoint_2 * 180 / M_PI;
                         current_operating_rootNode = STATE_1;
                         break;
 
@@ -164,6 +161,9 @@ void loop(){
                     (currentServoAngle[i] < 0)? currentServoAngle[i] = 0: currentServoAngle[i];
                 }
 
+                Serial.print("new: ");Serial.print(currentServoAngle[1]);Serial.print(" , ");Serial.print(currentServoAngle[2]);Serial.print(" , ");Serial.println(currentServoAngle[3]);
+                
+
 
             }
 
@@ -176,6 +176,8 @@ void loop(){
             //simple grippper grab mapping logic
             currentServoAngle[5] = (1 - gripper_intensity) * 90;
 
+            Serial.print("Current New Effector Position: ( "); Serial.print(endEffectorVector.x);Serial.print(" , ") ;Serial.print(endEffectorVector.y); Serial.println(" )");
+
             //servo write new angle
             for(int i = 0; i < 6 ; i++){
                 servos[i].write(currentServoAngle[i]);
@@ -184,7 +186,7 @@ void loop(){
 
             
             
-            Serial.print("Current New Effector Position: ( "); Serial.print(endEffectorVector.x);Serial.print(" , ") ;Serial.print(endEffectorVector.y); Serial.println(" )");
+           
         }
 
         else{

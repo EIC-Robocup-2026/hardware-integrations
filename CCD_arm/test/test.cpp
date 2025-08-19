@@ -1,19 +1,19 @@
-#include <C:\Users\Admin\Desktop\hardware-integrations\header\Vector2D.h>
+#include "..\include\Vector2D.h"
 
 #include <iostream>
 #include <cmath>
 using namespace std;
 
-double l1 = 0.105; // length of link 1 controled by servo 2
-double l2 = 0.125; // length of link 2 controled by servo 3
-double l3 = 0.175; // length of link 3 controled by servo 4
+double l1 = 105; // length of link 1 controled by servo 2
+double l2 = 125; // length of link 2 controled by servo 3
+double l3 = 175; // length of link 3 controled by servo 4
 
 double dx = 0.2;
 double dy = 0.5;
 double dz = 1;
 
 double theta_2_rad = 20 * M_PI / 180;
-double theta_3_rad = 50 * M_PI / 180;
+double theta_3_rad = 120 * M_PI / 180;
 double theta_4_rad = 30 * M_PI / 180;
 
 double VLA_ARM_PROPORTIONAL_GAIN = 100; // proportional gain for VLA arm movement input, ADJUSTABLE — based on dx dz
@@ -31,9 +31,9 @@ int main() {
 
 
     //All vector links calculation
-    Vector2D link1 = Vector2D( -l1*cos(theta_2_rad) , l1*sin(theta_2_rad) );
-    Vector2D link2 = Vector2D( l2*cos( M_PI_2 - theta_2_rad + theta_3_rad) , l2*sin(M_PI/2 - theta_2_rad + theta_3_rad));
-    Vector2D link3 = Vector2D( l3 * cos(theta_4_rad + theta_3_rad - theta_2_rad) , l3 * sin(theta_4_rad + theta_3_rad - theta_2_rad));
+    Vector2D link1 = Vector2D( -l1 * cos(theta_2_rad) , l1 * sin(theta_2_rad) );
+    Vector2D link2 = Vector2D( l2 *cos( 3 * M_PI_2 - theta_3_rad - theta_2_rad) , l2 *sin( 3 * M_PI_2 - theta_3_rad - theta_2_rad));
+    Vector2D link3 = Vector2D( l3 * cos(M_PI + theta_4_rad - theta_3_rad - theta_2_rad), l3 * sin(M_PI + theta_4_rad - theta_3_rad - theta_2_rad));
     Vector2D endEffectorVector = link1.add(link2).add(link3);
     
     //Vector from joint to target location

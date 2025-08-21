@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Servo.h>
-#include "..\CCD_arm\include\Vector2D.h"
+#include "..\include\Vector2D.h"
 
 #define MIN_MICROSEC 500
 #define MAX_MICROSEC 2500
@@ -8,17 +8,17 @@
 #define VLA_ARM_PROPORTIONAL_GAIN 1     // proportional gain for VLA arm movement input, ADJUSTABLE — based on dx dz
 #define VLA_BASE_ROTATION_GAIN 1       // proportional gain for VLA base rotation input, ADJUSTABLE — based on dy
 #define VLA_GRIPPER_ROTATION_GAIN 1     // proportional gain for VLA gripper rotation input, ADJUSTABLE — based on roll
-#define CCD_ITERATION 200              // number of iteration for ccd execution
+#define CCD_ITERATION 200             // number of iteration for ccd execution
 
 // lengths of the robotic arm segments in millimeters
 #define l1 105 // length of link 1 controled by servo 2
 #define l2 125 // length of link 2 controled by servo 3
-#define l3 170 // length of link 3 controled by servo 4
+#define l3 120 // length of link 3 controled by servo 4
 
 
 // when initializing the servos the arm should be in the upright position with open gripper
 Servo servos[6];
-double currentServoAngle[6] = {90,120,30,20,10,90};
+double currentServoAngle[6] = {90,120,60,120,10,0};
 int attachPin[6] = {5,4,0,14,12,13}; //D1,D2,D3,D5,D6,D7
 
 // Lolin ESP8266 NodeMCU V3
@@ -68,6 +68,8 @@ void loop(){
             Serial.print("roll: ");Serial.println(roll);
             Serial.print("pitch: ");Serial.println(pitch);
             Serial.print("yaw: ");Serial.println(yaw);
+            Serial.print("gripper: ");Serial.println(gripper_intensity);
+            Serial.print("status: ");Serial.println(mission_status);
             
 
             
@@ -157,11 +159,11 @@ void loop(){
 
                 //clmaping servo angle between 0 and 180
                 for(int i = 0; i<6 ; i++){
-                    (currentServoAngle[i] > 180)? currentServoAngle[i] = 180: currentServoAngle[i];
-                    (currentServoAngle[i] < 0)? currentServoAngle[i] = 0: currentServoAngle[i];
+                    (currentServoAngle[i] > 230)? currentServoAngle[i] = 230: currentServoAngle[i];
+                    (currentServoAngle[i] < -50)? currentServoAngle[i] = -50: currentServoAngle[i];
                 }
 
-                Serial.print("new: ");Serial.print(currentServoAngle[1]);Serial.print(" , ");Serial.print(currentServoAngle[2]);Serial.print(" , ");Serial.println(currentServoAngle[3]);
+                // Serial.print("new: ");Serial.print(currentServoAngle[1]);Serial.print(" , ");Serial.print(currentServoAngle[2]);Serial.print(" , ");Serial.println(currentServoAngle[3]);
                 
 
 
@@ -181,7 +183,7 @@ void loop(){
             //servo write new angle
             for(int i = 0; i < 6 ; i++){
                 servos[i].write(currentServoAngle[i]);
-                Serial.print("New Servo Angle ");Serial.print(i);Serial.print(" : ");Serial.println(currentServoAngle[i]); //print for dubug
+                Serial.print("New Servo Angle ");Serial.print(i+1);Serial.print(" : ");Serial.println(currentServoAngle[i]); //print for dubug
             }
 
             

@@ -3,8 +3,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.conditions import IfCondition
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.conditions import IfCondition from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, Command
 from launch_ros.actions import Node
@@ -14,20 +13,19 @@ from launch.actions import RegisterEventHandler
 def generate_launch_description():
     package_name = 'robot_bringup'
     package_dir = os.path.join(get_package_share_directory(package_name))
-
     description_package_name = 'walkie_description'
 
-    default_robot = os.path.join(
-        get_package_share_directory(description_package_name),
+    default_robot = os.path.join( get_package_share_directory(description_package_name),
         'robots',
         'gz_walkie.urdf.xacro'
     )
-    robot_description_content = Command(['xacro ', default_robot])
     
     # Launch configuration variables
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     robot_model = LaunchConfiguration('robot_model', default=default_robot)
-    use_ros2_control = LaunchConfiguration('use_ros2_control', default='true')
+    ros2_control = LaunchConfiguration('ros2_control', default='topic_base')
+
+    robot_description_content = Command(['xacro ', default_robot, ' ros2_control:=', ros2_control])
 
     twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux','twist_mux.yaml')
     twist_mux = Node(
@@ -59,11 +57,11 @@ def generate_launch_description():
         launch_arguments={
             'use_sim_time': use_sim_time,
             'robot_model': robot_model,
-            'use_ros2_control': use_ros2_control,
+            'ros2_control': ros2_control,
         }.items()
     )
     
-    controllers_config = os.path.join(get_package_share_directory(description_package_name), 'config','ros2_controller', 'my_controllers.yaml')
+    controllers_config = os.path.join(get_package_share_directory(description_package_name), 'config','ros2_controller', 'miniwalkie_controller.yml')
     controller_manager_spawner= Node(
         package="controller_manager",
         executable="ros2_control_node",

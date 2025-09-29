@@ -4,6 +4,7 @@
 #include "motor.h"
 #include "wheel_feedback.h"
 #include "motor_controller.h"
+#include "buzzer.h"
 
 // micro-ROS includes
 #include <micro_ros_platformio.h>
@@ -101,6 +102,8 @@ enum states {
     AGENT_CONNECTED,
     AGENT_DISCONNECTED
 } state;
+
+Buzzer buzzer(4); // Using pin 4 for the buzzer
 
 void velocity_command_callback(const void * msgin) {
     const sensor_msgs__msg__JointState * msg = (const sensor_msgs__msg__JointState *)msgin;
@@ -250,6 +253,9 @@ void setup() {
     Serial.begin(115200);
     Wire.begin(MOTOR_SDA, MOTOR_SCL);
 
+    // Play boot music
+    buzzer.playBootMusic();
+
     ESP32Encoder::useInternalWeakPullResistors = puType::up;
 
     // Setup encoders using the defined pins
@@ -299,6 +305,9 @@ void loop() {
             state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
             if (state == WAITING_AGENT) {
                 destroy_entities();
+            } else {
+                // Play connected sound when successfully connected
+                buzzer.playConnectedSound();
             }
             break;
         
@@ -338,6 +347,8 @@ void loop() {
             break;
 
         case AGENT_DISCONNECTED:
+            // Play disconnected sound
+            buzzer.playDisconnectedSound();
             // Stop motors for safety
             stop_motors();
             

@@ -34,6 +34,7 @@ private:
     // Compute feed-forward term
     float computeFeedForward(float targetVel) {
         if (!useFF) return 0;
+        if (targetVel == 0) return 0;
         float ff = targetVel * ff_m + (targetVel > 0 ? ff_b : -ff_b);
         return constrain(ff, minOutput, maxOutput);
     }

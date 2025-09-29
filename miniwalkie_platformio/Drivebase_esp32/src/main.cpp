@@ -90,6 +90,18 @@ MotorSpeedController controller_fr(Motor_2, wheel_2);
 MotorSpeedController controller_br(Motor_3, wheel_3);
 MotorSpeedController controller_bl(Motor_4, wheel_4);
 
+#define ROS_LED_PIN 2  // You can change this to any GPIO pin you want to use
+#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){return false;}}
+#define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
+
+// Add state enum and variable
+enum states {
+    WAITING_AGENT,
+    AGENT_AVAILABLE,
+    AGENT_CONNECTED,
+    AGENT_DISCONNECTED
+} state;
+
 void velocity_command_callback(const void * msgin) {
     const sensor_msgs__msg__JointState * msg = (const sensor_msgs__msg__JointState *)msgin;
     
@@ -109,21 +121,19 @@ void velocity_command_callback(const void * msgin) {
     }
 }
 
-// Function to initialize micro-ROS
-bool init_microros() {
-    allocator = rcl_get_default_allocator();
-
-    // Create init_options and set domain ID
-    init_options = rcl_get_zero_initialized_init_options();
-    rcl_init_options_init(&init_options, allocator);
-    rcl_init_options_set_domain_id(&init_options, 23);
+void stop_motors() {
+    controller_fl.setTargetSpeed(0);
+    controller_fr.setTargetSpeed(0);
+    controller_br.setTargetSpeed(0);
+    controller_bl.setTargetSpeed(0);
     
-    // Initialize support with custom options
-    rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator);
-    
-    // Create node
-    rclc_node_init_default(&node, "drivebase_node", "", &support);
+    controller_fl.update();
+    controller_fr.update();
+    controller_br.update();
+    controller_bl.update();
+}
 
+bool init_messages() {
     // Initialize and set frame_id
     rosidl_runtime_c__String__init(&joint_state_msg.header.frame_id);
     rosidl_runtime_c__String__assign(&joint_state_msg.header.frame_id, "base_link");
@@ -153,16 +163,14 @@ bool init_microros() {
         rosidl_runtime_c__String__assign(&joint_state_msg.name.data[i], joint_names[i]);
     }
 
-    // Initialize velocity command message with JointState format
+    // Initialize velocity command message
     rosidl_runtime_c__String__init(&velocity_command_msg.header.frame_id);
     rosidl_runtime_c__String__assign(&velocity_command_msg.header.frame_id, "");
 
-    // Initialize velocity array for commands
     velocity_command_msg.velocity.capacity = JOINT_COUNT;
     velocity_command_msg.velocity.size = JOINT_COUNT;
     velocity_command_msg.velocity.data = (double*)malloc(JOINT_COUNT * sizeof(double));
 
-    // Initialize other arrays (we won't use these but they need to be initialized)
     velocity_command_msg.position.capacity = 0;
     velocity_command_msg.position.size = 0;
     velocity_command_msg.position.data = NULL;
@@ -180,28 +188,62 @@ bool init_microros() {
         rosidl_runtime_c__String__assign(&velocity_command_msg.name.data[i], joint_names[i]);
     }
 
-    // Create publisher
-    rclc_publisher_init_default(
+    return true;
+}
+
+bool create_entities() {
+    allocator = rcl_get_default_allocator();
+    
+    if(init_messages() == false){
+        return false;
+    }
+
+    // Create init_options and set domain ID
+    init_options = rcl_get_zero_initialized_init_options();
+    RCCHECK(rcl_init_options_init(&init_options, allocator));
+    RCCHECK(rcl_init_options_set_domain_id(&init_options, 23));
+    
+    // Initialize support with custom options
+    RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
+    
+    // Create node
+    RCCHECK(rclc_node_init_default(&node, "drivebase_node", "", &support));
+
+    // Initialize publishers and subscribers
+    RCCHECK(rclc_publisher_init_default(
         &joint_state_publisher,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, JointState),
-        "drivebase_joint_states");
+        "drivebase_joint_states"));
 
-    // Update subscriber initialization to use JointState message type
-    rclc_subscription_init_default(
+    RCCHECK(rclc_subscription_init_default(
         &velocity_command_subscriber,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, JointState),
-        "drivebase_joint_cmd");
+        "drivebase_joint_cmd"));
 
     // Create executors
-    rclc_executor_init(&executor_cmd_vel_sub, &support.context, 1, &allocator);
-    rclc_executor_init(&executor_joint_state_pub, &support.context, 1, &allocator);
-    rclc_executor_add_subscription(&executor_cmd_vel_sub, &velocity_command_subscriber, 
-                                 &velocity_command_msg, &velocity_command_callback,
-                                 ON_NEW_DATA);
-
+    RCCHECK(rclc_executor_init(&executor_cmd_vel_sub, &support.context, 1, &allocator));
+    RCCHECK(rclc_executor_init(&executor_joint_state_pub, &support.context, 1, &allocator));
+    RCCHECK(rclc_executor_add_subscription(&executor_cmd_vel_sub, &velocity_command_subscriber, 
+                                         &velocity_command_msg, &velocity_command_callback,
+                                         ON_NEW_DATA));
     return true;
+}
+
+void destroy_entities() {
+    rmw_context_t * rmw_context = rcl_context_get_rmw_context(&support.context);
+    (void) rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
+
+    rcl_publisher_fini(&joint_state_publisher, &node);
+    
+    rcl_subscription_fini(&velocity_command_subscriber, &node);
+
+    rclc_executor_fini(&executor_cmd_vel_sub);
+    rclc_executor_fini(&executor_joint_state_pub);
+   
+    rcl_node_fini(&node);
+    rclc_support_fini(&support);
 }
 
 void setup() {
@@ -232,42 +274,82 @@ void setup() {
     controller_br.setOutputLimits(-255, 255);
     controller_bl.setOutputLimits(-255, 255);
 
-    // Initialize micro-ROS
+    // Add ROS connection LED
+    pinMode(ROS_LED_PIN, OUTPUT);
+    digitalWrite(ROS_LED_PIN, LOW);
+
+    // Initialize micro-ROS transport
+    Serial.begin(115200);
     set_microros_serial_transports(Serial);
-    init_microros();
+    init_messages();
+
+    // Set initial state
+    state = WAITING_AGENT;
 }
 
 void loop() {
-    rclc_executor_spin_some(&executor_cmd_vel_sub, RCL_MS_TO_NS(10));
+    switch(state) {
+        case WAITING_AGENT:
+            // Check for agent connection
+            state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_AVAILABLE : WAITING_AGENT;
+            break;
+        
+        case AGENT_AVAILABLE:
+            // Create micro-ROS entities
+            state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+            if (state == WAITING_AGENT) {
+                destroy_entities();
+            }
+            break;
+        
+        case AGENT_CONNECTED:
+            // Check connection and run normal operation
+            state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1)) ? AGENT_CONNECTED : AGENT_DISCONNECTED;
+            if (state == AGENT_CONNECTED) {
+                rclc_executor_spin_some(&executor_cmd_vel_sub, RCL_MS_TO_NS(10));
 
-    // Update all controllers
-    controller_fl.update();
-    controller_fr.update();
-    controller_br.update();
-    controller_bl.update();
+                // Update all controllers
+                controller_fl.update();
+                controller_fr.update();
+                controller_br.update();
+                controller_bl.update();
 
-    // Update timestamp
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    joint_state_msg.header.stamp.sec = ts.tv_sec;
-    joint_state_msg.header.stamp.nanosec = ts.tv_nsec;
+                // Update timestamp
+                struct timespec ts;
+                clock_gettime(CLOCK_REALTIME, &ts);
+                joint_state_msg.header.stamp.sec = ts.tv_sec;
+                joint_state_msg.header.stamp.nanosec = ts.tv_nsec;
 
-    // Update joint states with proper casting
-    joint_positions[0] = (double)wheel_1.getAngularPosition();
-    joint_positions[1] = (double)wheel_2.getAngularPosition();
-    joint_positions[2] = (double)wheel_3.getAngularPosition();
-    joint_positions[3] = (double)wheel_4.getAngularPosition();
+                joint_positions[0] = (double)wheel_1.getAngularPosition();
+                joint_positions[1] = (double)wheel_2.getAngularPosition();
+                joint_positions[2] = (double)wheel_3.getAngularPosition();
+                joint_positions[3] = (double)wheel_4.getAngularPosition();
 
-    joint_velocities[0] = (double)wheel_1.getAngularVelocity();
-    joint_velocities[1] = (double)wheel_2.getAngularVelocity();
-    joint_velocities[2] = (double)wheel_3.getAngularVelocity();
-    joint_velocities[3] = (double)wheel_4.getAngularVelocity();
+                joint_velocities[0] = (double)wheel_1.getAngularVelocity();
+                joint_velocities[1] = (double)wheel_2.getAngularVelocity();
+                joint_velocities[2] = (double)wheel_3.getAngularVelocity();
+                joint_velocities[3] = (double)wheel_4.getAngularVelocity();
 
-    // Publish joint states
-    rcl_publish(&joint_state_publisher, &joint_state_msg, NULL);
+                rcl_publish(&joint_state_publisher, &joint_state_msg, NULL);
 
-    // Handle ROS communications
-    rclc_executor_spin_some(&executor_joint_state_pub, RCL_MS_TO_NS(10));
-    
-    // delay(1);  // 100Hz update rate
+                // Handle ROS communications
+                rclc_executor_spin_some(&executor_joint_state_pub, RCL_MS_TO_NS(10));
+            }
+            break;
+
+        case AGENT_DISCONNECTED:
+            // Stop motors for safety
+            stop_motors();
+            
+            // Cleanup and restart
+            destroy_entities();
+            state = WAITING_AGENT;
+            break;
+
+        default:
+            break;
+    }
+
+    // Update connection status LED
+    digitalWrite(ROS_LED_PIN, state == AGENT_CONNECTED);
 }

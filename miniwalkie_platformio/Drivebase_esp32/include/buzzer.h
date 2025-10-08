@@ -9,11 +9,11 @@ public:
     void playBootMusic();
     void playConnectedSound();
     void playDisconnectedSound();
+    void playNote(int note, int duration);
     void stop();
 
 private:
     uint8_t _pin;
-    void playNote(int note, int duration);
     
     // Erika's boot music
     static const int BOOT_MELODY_SIZE = 23;

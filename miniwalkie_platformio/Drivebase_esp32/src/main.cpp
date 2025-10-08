@@ -5,6 +5,7 @@
 #include "wheel_feedback.h"
 #include "motor_controller.h"
 #include "buzzer.h"
+#include "pitches.h"
 
 // micro-ROS includes
 #include <micro_ros_platformio.h>
@@ -91,6 +92,29 @@ MotorSpeedController controller_fr(Motor_2, wheel_2);
 MotorSpeedController controller_br(Motor_3, wheel_3);
 MotorSpeedController controller_bl(Motor_4, wheel_4);
 
+// Task for motor control
+TaskHandle_t motorControlTaskHandle = NULL;
+
+void motor_control_task(void *pvParameters) {
+    TickType_t xLastWakeTime;
+    const TickType_t xFrequency = pdMS_TO_TICKS(10); // 10ms, 100Hz
+
+    // Initialise the xLastWakeTime variable with the current time.
+    xLastWakeTime = xTaskGetTickCount();
+
+    for (;;) {
+        // Update all controllers
+        controller_fl.update();
+        controller_fr.update();
+        controller_br.update();
+        controller_bl.update();
+
+        // Wait for the next cycle.
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    }
+}
+
+
 #define ROS_LED_PIN 2  // You can change this to any GPIO pin you want to use
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){return false;}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
@@ -104,6 +128,7 @@ enum states {
 } state;
 
 Buzzer buzzer(4); // Using pin 4 for the buzzer
+#define BOOT_MUSIC false // Set to false to disable boot music
 
 void velocity_command_callback(const void * msgin) {
     const sensor_msgs__msg__JointState * msg = (const sensor_msgs__msg__JointState *)msgin;
@@ -129,11 +154,6 @@ void stop_motors() {
     controller_fr.setTargetSpeed(0);
     controller_br.setTargetSpeed(0);
     controller_bl.setTargetSpeed(0);
-    
-    controller_fl.update();
-    controller_fr.update();
-    controller_br.update();
-    controller_bl.update();
 }
 
 bool init_messages() {
@@ -234,19 +254,21 @@ bool create_entities() {
     return true;
 }
 
-void destroy_entities() {
+bool destroy_entities() {
     rmw_context_t * rmw_context = rcl_context_get_rmw_context(&support.context);
     (void) rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
-    rcl_publisher_fini(&joint_state_publisher, &node);
-    
-    rcl_subscription_fini(&velocity_command_subscriber, &node);
+    rcl_ret_t rc = RCL_RET_OK;
 
-    rclc_executor_fini(&executor_cmd_vel_sub);
-    rclc_executor_fini(&executor_joint_state_pub);
-   
-    rcl_node_fini(&node);
-    rclc_support_fini(&support);
+    rc += rclc_executor_fini(&executor_cmd_vel_sub);
+    rc += rclc_executor_fini(&executor_joint_state_pub);
+    rc += rcl_publisher_fini(&joint_state_publisher, &node);
+    rc += rcl_subscription_fini(&velocity_command_subscriber, &node);
+    rc += rcl_node_fini(&node);
+    rc += rclc_support_fini(&support);
+    rc += rcl_init_options_fini(&init_options);
+
+    return (rc == RCL_RET_OK);
 }
 
 void setup() {
@@ -254,7 +276,10 @@ void setup() {
     Wire.begin(MOTOR_SDA, MOTOR_SCL);
 
     // Play boot music
-    buzzer.playBootMusic();
+    if(BOOT_MUSIC){
+        buzzer.playBootMusic();
+    }
+    buzzer.playNote(NOTE_G5, 2); // Short pause after boot music
 
     ESP32Encoder::useInternalWeakPullResistors = puType::up;
 
@@ -266,13 +291,13 @@ void setup() {
 
     // Configure initial PID gains
     controller_fl.setPIDGains(0.05, 70.0, 0.07);
-    controller_fl.setFeedForward(12.8311, 16.6545); 
+    controller_fl.setFeedForward(14.8311, 16.6545); 
     controller_fr.setPIDGains(0.05, 70.0, 0.07);
-    controller_fr.setFeedForward(12.8311, 16.6545); 
+    controller_fr.setFeedForward(14.8311, 16.6545); 
     controller_br.setPIDGains(0.05, 70.0, 0.07);
-    controller_br.setFeedForward(12.8311, 16.6545); 
+    controller_br.setFeedForward(14.8311, 16.6545); 
     controller_bl.setPIDGains(0.05, 70.0, 0.07);
-    controller_bl.setFeedForward(12.8311, 16.6545); 
+    controller_bl.setFeedForward(14.8311, 16.6545); 
 
     // Set output limits
     controller_fl.setOutputLimits(-255, 255);
@@ -285,12 +310,21 @@ void setup() {
     digitalWrite(ROS_LED_PIN, LOW);
 
     // Initialize micro-ROS transport
-    Serial.begin(115200);
     set_microros_serial_transports(Serial);
     init_messages();
 
     // Set initial state
     state = WAITING_AGENT;
+
+    // Create motor control task
+    xTaskCreatePinnedToCore(
+        motor_control_task,     /* Task function. */
+        "MotorControlTask",     /* name of task. */
+        4096,                   /* Stack size of task */
+        NULL,                   /* parameter of the task */
+        1,                      /* priority of the task */
+        &motorControlTaskHandle,/* Task handle to keep track of created task */
+        1);                     /* pin task to core 1 */
 }
 
 void loop() {
@@ -317,12 +351,6 @@ void loop() {
             if (state == AGENT_CONNECTED) {
                 rclc_executor_spin_some(&executor_cmd_vel_sub, RCL_MS_TO_NS(10));
 
-                // Update all controllers
-                controller_fl.update();
-                controller_fr.update();
-                controller_br.update();
-                controller_bl.update();
-
                 // Update timestamp
                 struct timespec ts;
                 clock_gettime(CLOCK_REALTIME, &ts);
@@ -339,7 +367,7 @@ void loop() {
                 joint_velocities[2] = (double)wheel_3.getAngularVelocity();
                 joint_velocities[3] = (double)wheel_4.getAngularVelocity();
 
-                rcl_publish(&joint_state_publisher, &joint_state_msg, NULL);
+                RCSOFTCHECK(rcl_publish(&joint_state_publisher, &joint_state_msg, NULL));
 
                 // Handle ROS communications
                 rclc_executor_spin_some(&executor_joint_state_pub, RCL_MS_TO_NS(10));

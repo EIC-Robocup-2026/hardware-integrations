@@ -32,7 +32,7 @@ def generate_launch_description():
         ['xacro ', default_robot, ' ros2_control:=', ros2_control])
 
     twist_mux_params = os.path.join(get_package_share_directory(
-        package_name), 'config', 'twist_mux', 'twist_mux.yaml')
+        package_name), 'config', 'twist_mux', 'twist_mux.yml')
     twist_mux = Node(
         package="twist_mux",
         executable="twist_mux",

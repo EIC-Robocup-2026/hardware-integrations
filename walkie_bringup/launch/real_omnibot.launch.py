@@ -25,8 +25,7 @@ def generate_launch_description():
     # Launch configuration variables
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     robot_model = LaunchConfiguration('robot_model', default=default_robot)
-    ros2_control = LaunchConfiguration('ros2_control', default='topic_base')
-    use_lidars = LaunchConfiguration('use_lidars', default='true')
+    ros2_control = LaunchConfiguration('ros2_control', default='real_robot')
 
     robot_description_content = Command(
         ['xacro ', default_robot, ' ros2_control:=', ros2_control])
@@ -111,7 +110,6 @@ def generate_launch_description():
             os.path.join(get_package_share_directory(package_name),
                          'launch', 'dual_lidar_hokuyo_lakibeam.launch.py')
         ),
-        condition=IfCondition(use_lidars)
     )
 
 

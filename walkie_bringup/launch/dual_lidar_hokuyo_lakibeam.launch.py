@@ -112,7 +112,7 @@ def generate_launch_description():
                     {'queue_size': 5},
                     {'angle_increment': 0.001},
                     {'scan_time': 0.067},
-                    {'range_min': 0.01},
+                    {'range_min': 0.3},
                     {'range_max': 25.0},
                     {'min_height': -1.0},
                     {'max_height': 1.0},
@@ -121,9 +121,11 @@ def generate_launch_description():
                     {'inf_epsilon': 1.0},
                     {'use_inf': True},
                     {'allowed_radius': 0.45},
-                    {'enable_shadow_filter': True},
-                    {'enable_average_filter': True},
+                    {'enable_shadow_filter': False},
+                    {'enable_average_filter': False},
                     ],
+                remappings = [('/merged_lidar' , '/scan')]
+                ,
             )
         ],
         output='screen',

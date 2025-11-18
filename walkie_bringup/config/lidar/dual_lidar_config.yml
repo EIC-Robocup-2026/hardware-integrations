@@ -28,8 +28,15 @@ lakibeam_lidar:
   ros__parameters:
     frame_id: 'back_lidar_link'
     output_topic: 'back_lidar'
+    
     inverted: false
-    hostip: '10.0.0.201'
+    
+    #jetson
+    hostip: '10.0.0.201' 
+
+    #walkie pc
+    # hostip: '10.0.0.6' 
+    
     port: '2368'
     angle_offset: 0
     sensorip: '10.0.0.102'

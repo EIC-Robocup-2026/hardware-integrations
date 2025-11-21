@@ -20,6 +20,7 @@ import serial.tools.list_ports
 import time
 import argparse
 import sys
+import threading
 from typing import Optional, List, Tuple
 
 
@@ -39,6 +40,8 @@ class ESP32ServoTester:
         self.debug = debug
         self.serial = None
         self.port = port or self._find_esp32_port()
+        self.reader_thread = None
+        self.reader_running = False
         
         if not self.port:
             raise RuntimeError("No ESP32 found. Please specify port with --port")
@@ -61,16 +64,51 @@ class ESP32ServoTester:
             self.serial = serial.Serial(self.port, self.baud, timeout=1)
             time.sleep(2)  # Wait for ESP32 to reset
             print(f"✓ Connected to {self.port} at {self.baud} baud\n")
+            
+            # Start background reader thread
+            self.reader_running = True
+            self.reader_thread = threading.Thread(target=self._read_serial_background, daemon=True)
+            self.reader_thread.start()
+            
             return True
         except Exception as e:
             print(f"✗ Connection failed: {e}")
             return False
     
+    def _read_serial_background(self):
+        """Background thread to continuously read and display ESP32 output"""
+        print("[ESP32 Output]")
+        print("-" * 50)
+        
+        while self.reader_running and self.serial and self.serial.is_open:
+            try:
+                if self.serial.in_waiting:
+                    data = self.serial.read(self.serial.in_waiting)
+                    text = data.decode('utf-8', errors='ignore')
+                    # Print ESP32 output in real-time with prefix
+                    for line in text.split('\n'):
+                        if line.strip():
+                            print(f"║ {line}")
+                    sys.stdout.flush()
+            except Exception as e:
+                if self.reader_running:
+                    print(f"║ [Read Error: {e}]")
+                break
+            
+            time.sleep(0.01)
+    
     def disconnect(self):
         """Disconnect from serial port"""
+        self.reader_running = False
+        
+        if self.reader_thread:
+            self.reader_thread.join(timeout=1)
+        
         if self.serial:
             self.serial.close()
-            print("\nDisconnected")
+        
+        print("-" * 50)
+        print("\nDisconnected")
     
     def send_command(self, servo_id: int, angle: float) -> bool:
         """
@@ -94,11 +132,8 @@ class ESP32ServoTester:
         command = f"S{servo_id},{angle}\n"
         
         try:
+            print(f"→ Sending: S{servo_id},{angle}")
             self.serial.write(command.encode())
-            if self.debug:
-                print(f"→ Sent: {command.strip()}")
-            else:
-                print(f"→ S{servo_id},{angle}")
             return True
         except Exception as e:
             print(f"✗ Send failed: {e}")
@@ -106,39 +141,17 @@ class ESP32ServoTester:
     
     def read_response(self, timeout: float = 1.0) -> str:
         """
-        Read serial response
+        Read serial response (with background reader running, this just waits)
         
         Args:
-            timeout: Read timeout in seconds
+            timeout: Wait timeout in seconds
         
         Returns:
-            Response string
+            Response string (may be empty if background reader is active)
         """
-        start_time = time.time()
-        response = ""
-        
-        while time.time() - start_time < timeout:
-            if self.serial.in_waiting:
-                try:
-                    byte = self.serial.read(1).decode('utf-8', errors='ignore')
-                    response += byte
-                    
-                    # Print in real-time if debug enabled
-                    if self.debug and byte not in ['\r', '\n']:
-                        print(byte, end='', flush=True)
-                    
-                    if byte == '\n':
-                        if self.debug:
-                            print()
-                        return response.strip()
-                except Exception as e:
-                    if self.debug:
-                        print(f"Read error: {e}")
-                    break
-            
-            time.sleep(0.01)
-        
-        return response.strip()
+        # With background reader running, just wait a bit for response
+        time.sleep(timeout)
+        return ""
     
     def test_single_servo(self, servo_id: int, angle: float, wait_time: float = 0.5):
         """Test a single servo movement"""
@@ -251,13 +264,7 @@ class ESP32ServoTester:
         print(f"\n{'='*50}")
         print("INTERACTIVE MODE")
         print(f"{'='*50}")
-        print("Commands:")
-        print("  S<id>,<angle>  - Send servo command (e.g., S0,90)")
-        print("  A              - Test all servos")
-        print("  R              - Test servo range")
-        print("  E              - Test edge cases")
-        print("  Q              - Quit")
-        print()
+        self._print_help()
         
         while True:
             try:
@@ -265,6 +272,9 @@ class ESP32ServoTester:
                 
                 if cmd == 'Q':
                     break
+                
+                elif cmd == 'H':
+                    self._print_help()
                 
                 elif cmd == 'A':
                     self.test_all_servos(angle=90.0)
@@ -293,12 +303,23 @@ class ESP32ServoTester:
                         print("Format: S<id>,<angle> (e.g., S0,90)")
                 
                 else:
-                    print("Unknown command")
+                    print("Unknown command. Type 'H' for help.")
             
             except KeyboardInterrupt:
                 break
             except Exception as e:
                 print(f"Error: {e}")
+    
+    def _print_help(self):
+        """Print help message"""
+        print("\nCommands:")
+        print("  S<id>,<angle>  - Send servo command (e.g., S0,90)")
+        print("  A              - Test all servos at 90°")
+        print("  R              - Test servo range (0°, 45°, 90°, 135°, 180°)")
+        print("  E              - Test edge cases and error handling")
+        print("  H              - Show this help message")
+        print("  Q              - Quit")
+        print()
     
     def run_full_test(self):
         """Run a comprehensive test suite"""

@@ -19,14 +19,18 @@ static unsigned long lastUpdateMs = 0;
 // ============================================
 
 /**
- * Convert angle (0-180 degrees) to PWM microseconds
+ * Convert angle to PWM microseconds based on servo profile range
  */
 static uint16_t angleToMicroseconds(double angle, const ServoProfile &profile) {
-    // Clamp angle to valid range
-    angle = constrain(angle, 0.0, 180.0);
+    // Clamp angle to profile's servo range (0 to servoRangeDegrees)
+    angle = constrain(angle, 0.0, profile.servoRangeDegrees);
     
     // Linear interpolation from angle range to microsecond range
-    return map(angle * 100, 0, 18000, profile.minPulseUs, profile.maxPulseUs) / 100.0;
+    // angle: 0 to servoRangeDegrees maps to minPulseUs to maxPulseUs
+    double normalized = angle / profile.servoRangeDegrees;
+    double microseconds = profile.minPulseUs + (normalized * (double)(profile.maxPulseUs - profile.minPulseUs));
+    
+    return (uint16_t)constrain(microseconds, profile.minPulseUs, profile.maxPulseUs);
 }
 
 /**
@@ -154,8 +158,8 @@ void updateMotion() {
             state.isMoving = true;
         }
         
-        // Ensure angle is within valid range
-        newAngle = constrain(newAngle, 0.0, 180.0);
+        // Ensure angle is within profile's safe limits
+        newAngle = constrain(newAngle, profile.minAngleLimit, profile.maxAngleLimit);
         state.currentAngle = newAngle;
         
         // Write to servo
@@ -168,8 +172,10 @@ bool setServoTarget(uint8_t servoId, double targetAngle) {
         return false;
     }
     
-    // Clamp target angle to valid range
-    targetAngle = constrain(targetAngle, 0.0, 180.0);
+    const ServoProfile &profile = activeProfiles[servoId];
+    
+    // Clamp target angle to profile limits (minAngleLimit to maxAngleLimit)
+    targetAngle = constrain(targetAngle, profile.minAngleLimit, profile.maxAngleLimit);
     servoStates[servoId].targetAngle = targetAngle;
     
     if (DEBUG_SERIAL) {

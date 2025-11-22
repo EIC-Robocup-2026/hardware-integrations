@@ -4,6 +4,7 @@
 #include "Config.h"
 #include <esp_now.h>
 #include <WiFi.h>
+#include "MotionControl.h"
 
 // ============================================
 // ESP-NOW Command Receiver Implementation
@@ -19,41 +20,41 @@ private:
     // Static callback (required by ESP-NOW)
     static void onDataReceived(const esp_now_recv_info_t *recvInfo, const uint8_t *data, int dataLen) {
         if (instance == nullptr) return;
-        
-        if (dataLen != sizeof(EspNowCommand)) {
+
+        // Only accept the batch packet: exactly 7 floats
+        if (dataLen == (int)(sizeof(float) * NUM_SERVOS)) {
+            // Copy floats safely
+            float angles[NUM_SERVOS];
+            memcpy(angles, data, sizeof(float) * NUM_SERVOS);
+
             if (DEBUG_SERIAL) {
-                Serial.printf("ERROR: Received data with wrong size: %d bytes\n", dataLen);
+                const uint8_t *macAddr = recvInfo->src_addr;
+                Serial.printf("ESP-NOW RX: ALL 7 angles from MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                             macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
+            }
+
+            // Apply each angle to motion controller
+            for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+            float a = angles[i];
+            const ServoProfile &profile = SERVO_PROFILES[i];
+            if (a < (float)profile.minAngleLimit || a > (float)profile.maxAngleLimit) {
+                    if (DEBUG_SERIAL) {
+                        Serial.printf("ERROR: Angle for servo %d out of range: %.1f\n", i, a);
+                    }
+                    continue; // skip invalid values but continue with others
+                }
+                // Use motion control API to set target
+                setServoTarget(i, (double)a);
+                if (DEBUG_SERIAL) {
+                    Serial.printf("  -> Set Servo %d target to %.1f°\n", i, a);
+                }
             }
             return;
         }
-        
-        const EspNowCommand *cmd = (const EspNowCommand *)data;
-        
-        // Validate command
-        if (cmd->servoId >= NUM_SERVOS) {
-            if (DEBUG_SERIAL) {
-                Serial.printf("ERROR: Invalid servo ID: %d\n", cmd->servoId);
-            }
-            return;
-        }
-        
-        if (cmd->targetAngle < 0.0 || cmd->targetAngle > 180.0) {
-            if (DEBUG_SERIAL) {
-                Serial.printf("ERROR: Invalid angle: %.1f\n", cmd->targetAngle);
-            }
-            return;
-        }
-        
-        // Store command
-        instance->lastServoId = cmd->servoId;
-        instance->lastTargetAngle = cmd->targetAngle;
-        instance->commandAvailable = true;
-        
+
+        // Unknown or unsupported packet size — ignore
         if (DEBUG_SERIAL) {
-            const uint8_t *macAddr = recvInfo->src_addr;
-            Serial.printf("ESP-NOW RX: Servo %d -> %.1f° from MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
-                         cmd->servoId, cmd->targetAngle,
-                         macAddr[0], macAddr[1], macAddr[2], macAddr[3], macAddr[4], macAddr[5]);
+            Serial.printf("ESP-NOW RX: Ignored packet with unexpected size: %d bytes\n", dataLen);
         }
     }
     

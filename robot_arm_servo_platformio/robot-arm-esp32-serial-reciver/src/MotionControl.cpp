@@ -61,7 +61,7 @@ static double calculateMaxDelta(double currentVelocity, double maxVelocity,
     
     // Maximum angle change = average velocity * time
     double maxDelta = ((currentVelocity + newVelocity) / 2.0) * dt;
-    
+
     return maxDelta;
 }
 
@@ -149,7 +149,7 @@ void updateMotion() {
             state.isMoving = false;
         } else {
             // Move towards target by maxDelta
-            newAngle = state.currentAngle + (direction * maxDelta);
+            newAngle = state.currentAngle + maxDelta;
             // Update velocity (accelerating towards max)
             state.velocity = state.velocity + (direction * (profile.maxAcceleration * deltaTimeMs / 1000.0));
             if (fabs(state.velocity) > profile.maxVelocity) {
@@ -162,9 +162,32 @@ void updateMotion() {
         newAngle = constrain(newAngle, profile.minAngleLimit, profile.maxAngleLimit);
         state.currentAngle = newAngle;
         
+        if(DEBUG_SERIAL && i == 1) {
+            // Debug the direction and error
+            Serial.printf("Servo %d: Curr=%.1f°, Target=%.1f°, Error=%.2f°, New=%.2f°, Vel=%.2f°/s\n",
+                          i, state.currentAngle, state.targetAngle, error, newAngle, state.velocity);
+        }
+
         // Write to servo
         writeServoAngle(i, state.currentAngle);
+
     }
+    // if (DEBUG_SERIAL) {
+    //     // One line summary of servo states
+    //     // Current angles
+    //     Serial.print("Currents: ");
+    //     for (int i = 0; i < NUM_SERVOS; i++) {
+    //         Serial.printf("S%d:%.1f° ", i, servoStates[i].currentAngle);
+    //     }
+    //     Serial.println();
+    //     // Target angles
+    //     Serial.print("Targets: ");
+    //     for (int i = 0; i < NUM_SERVOS; i++) {
+    //         Serial.printf("S%d:%.1f° ", i, servoStates[i].targetAngle);
+    //     }
+    //     Serial.println();
+
+    // }
 }
 
 bool setServoTarget(uint8_t servoId, double targetAngle) {

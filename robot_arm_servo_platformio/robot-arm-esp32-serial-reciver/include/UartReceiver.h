@@ -2,6 +2,7 @@
 
 #include "CommandReceiver.h"
 #include "Config.h"
+#include "MotionControl.h"
 
 // ============================================
 // UART Command Receiver Implementation
@@ -23,8 +24,8 @@ public:
         
         if (DEBUG_SERIAL) {
             Serial.println("\n=== UART Receiver Initialized ===");
-            Serial.println("Command format: S<id>,<angle>\\n");
-            Serial.println("Example: S2,120.5\\n");
+            Serial.println("Command format: CSV of 7 angles for servos 1..7");
+            Serial.println("Example: 90,90,90,10,20,30,40\n  (sets servos 0..6 respectively)");
         }
     }
     
@@ -76,48 +77,53 @@ public:
     }
 
 private:
-    /**
-     * Parse UART command format: "S<id>,<angle>"
-     * Example: "S2,120.5" → servo 2, angle 120.5°
-     */
     bool parseCommand(const String &cmd) {
-        // Command must start with 'S' or 's'
-        if (cmd.length() < 3 || (cmd[0] != 'S' && cmd[0] != 's')) {
+        // Expect a CSV of exactly NUM_SERVOS numeric values: "90,90,90,10,20,30,40"
+        String work = cmd;
+        work.trim();
+        if (work.length() == 0) return false;
+
+        int commaCount = 0;
+        for (int i = 0; i < work.length(); i++) if (work[i] == ',') commaCount++;
+        if (commaCount != (NUM_SERVOS - 1)) {
+            if (DEBUG_SERIAL) Serial.println("UART: Invalid CSV format (need 7 values)");
             return false;
         }
-        
-        // Find the comma separator
-        int commaPos = cmd.indexOf(',', 1);
-        if (commaPos < 0) {
-            return false;
-        }
-        
-        // Extract servo ID
-        String idStr = cmd.substring(1, commaPos);
-        uint8_t id = idStr.toInt();
-        
-        if (id >= NUM_SERVOS) {
-            if (DEBUG_SERIAL) {
-                Serial.printf("ERROR: Servo ID %d out of range (0-%d)\n", id, NUM_SERVOS - 1);
+
+        float vals[NUM_SERVOS];
+        int start = 0;
+        for (int i = 0; i < NUM_SERVOS; i++) {
+            int commaPos = work.indexOf(',', start);
+            String tok;
+            if (commaPos == -1) tok = work.substring(start);
+            else tok = work.substring(start, commaPos);
+            tok.trim();
+            if (tok.length() == 0) {
+                if (DEBUG_SERIAL) Serial.println("UART: Empty token in CSV");
+                return false;
             }
-            return false;
+            vals[i] = tok.toFloat();
+            start = (commaPos == -1) ? work.length() : commaPos + 1;
         }
-        
-        // Extract angle
-        String angleStr = cmd.substring(commaPos + 1);
-        double angle = angleStr.toFloat();
-        
-        // Validate angle range
-        if (angle < 0.0 || angle > 180.0) {
-            if (DEBUG_SERIAL) {
-                Serial.printf("ERROR: Angle %.1f out of range (0-180)\n", angle);
+
+        // Validate against per-servo profile limits and apply
+        for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+            float a = vals[i];
+            const ServoProfile &profile = SERVO_PROFILES[i];
+            if (a < (float)profile.minAngleLimit || a > (float)profile.maxAngleLimit) {
+                if (DEBUG_SERIAL) Serial.printf("UART: Angle %.1f out of range for servo %d (allowed %.1f-%.1f)\n",
+                                               a, i+1, profile.minAngleLimit, profile.maxAngleLimit);
+                return false;
             }
-            return false;
         }
-        
-        lastServoId = id;
-        lastTargetAngle = angle;
-        
+
+        for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+            setServoTarget(i, (double)vals[i]);
+            if (DEBUG_SERIAL) Serial.printf("UART CSV: Set servo%d -> %.1f°\n", i+1, vals[i]);
+        }
+
+        lastServoId = NUM_SERVOS - 1;
+        lastTargetAngle = vals[NUM_SERVOS - 1];
         return true;
     }
 };

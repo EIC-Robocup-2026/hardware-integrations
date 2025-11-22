@@ -1,4 +1,5 @@
 #pragma once
+#include <Arduino.h>
 
 // ============================================
 // COMMAND RECEPTION MODE (select one)
@@ -6,10 +7,9 @@
 #define COMMAND_MODE_UART    0
 #define COMMAND_MODE_ESPNOW  1
 
-// Select which mode to use
-// #define ACTIVE_COMMAND_MODE  COMMAND_MODE_UART      // Change to COMMAND_MODE_ESPNOW for ESP-NOW
-#define ACTIVE_COMMAND_MODE  COMMAND_MODE_ESPNOW 
-
+// Select which mode to use (change this to switch receiver)
+// #define ACTIVE_COMMAND_MODE  COMMAND_MODE_UART
+#define ACTIVE_COMMAND_MODE  COMMAND_MODE_ESPNOW
 
 // ============================================
 // UART Configuration
@@ -50,9 +50,9 @@ static const ServoProfile SERVO_PROFILES[NUM_SERVOS] = {
     // Servo 1 - Base rotation 
     {0,   135.0,  270.0,  0.0,    270.0,  30.0,  10.0,  450,  2420},
     // Servo 2 - Shoulder 
-    {1,   135.0,   270.0,  0.0,    270.0,  30.0,  10.0,  450,  2420},
+    {1,   180.0,   270.0,  0.0,    270.0,  30.0,  10.0,  450,  2420},
     // Servo 3 - Elbow 
-    {2,   135.0,   270.0,  0.0,    270.0,  30.0,  10.0,  450,  2420},
+    {2,   225.0,   270.0,  0.0,    270.0,  30.0,  10.0,  450,  2420},
     // Servo 4 - Wrist pitch 
     {3,   135.0,   270.0,  0.0,    270.0,  30.0,  10.0,  450,  2420},
     // Servo 5 - Wrist yaw 
@@ -60,14 +60,14 @@ static const ServoProfile SERVO_PROFILES[NUM_SERVOS] = {
     // Servo 6 - Wrist roll
     {5,   135.0,   270.0,  45.0,    225.0,  30.0,  10.0,  450,  2420},
     // Servo 7 - Gripper
-    {6,   270.0,   270.0,  0.0,   270.0,  30.0,  10.0,  450,  2420},
+    {6,   45.0,   270.0,  0.0,   270.0,  30.0,  10.0,  450,  2420},
 };
 
 // ============================================
 // Motion Control Parameters
 // ============================================
 #define MOTION_UPDATE_INTERVAL_MS  20  // Update servos every 20ms (~50Hz)
-#define ANGLE_TOLERANCE            0.1  // Consider servo "at target" within this tolerance
+#define ANGLE_TOLERANCE            0.5  // Consider servo "at target" within this tolerance
 
 // ============================================
 // ESP-NOW Configuration (if using ESP-NOW mode)
@@ -79,23 +79,6 @@ static const ServoProfile SERVO_PROFILES[NUM_SERVOS] = {
 // Example: {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
 // 40:4C:CA:5E:98:A8
 static const uint8_t ESPNOW_SENDER_MAC[6] = {0x40, 0x4C, 0xCA, 0x5E, 0x98, 0xA8};
-
-// ============================================
-// ESP-NOW Command Format
-// ============================================
-struct EspNowCommand {
-    uint8_t servoId;       // Servo index (0-6)
-    float   targetAngle;   // Target angle in degrees (0-180)
-};
-
-// ============================================
-// UART Command Format
-// ============================================
-// Format: "S<id>,<angle>\n"
-// Examples:
-//   S0,90.5\n   - Set servo 0 to 90.5 degrees
-//   S3,120\n    - Set servo 3 to 120 degrees
-//   S6,45.2\n   - Set servo 6 (gripper) to 45.2 degrees
 
 // ============================================
 // Debug & Serial Output

@@ -41,9 +41,9 @@ def generate_launch_description():
 
     twist_stamped_frame_id = 'base_footprint'
     twist_stamper_node = Node(
-        package='twist_stamper',
-        executable='twist_stamper',
-        name='twist_stamper',
+        package='robot_navigation',
+        executable='accel_stamp_node.py',
+        name='Accel_Stamp',
         output='screen',
         remappings=[
                 ('/cmd_vel_in', '/cmd_vel'),

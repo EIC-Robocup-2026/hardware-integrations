@@ -29,6 +29,7 @@ setup(
     entry_points={
         'console_scripts': [
             'joy_teleop = joy_interface.joy_cmdvel_process_node:main',
+            'joy_teleop_smooth = joy_interface.joy_cmdvel_process_smooth_node:main',
         ],
     },
 )

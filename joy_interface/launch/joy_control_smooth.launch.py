@@ -22,12 +22,12 @@ def generate_launch_description():
     # The executable 'joy_teleop' is defined in your package's setup.py.
     custom_teleop_node = Node(
         package='joy_interface',
-        executable='joy_teleop',
+        executable='joy_teleop_smooth',
         name='joy_teleop_translator',
         output='screen',
         parameters=[
-            {'max_linear_vel': 1.45},   # Max linear speed (for both X and Y)
-            {'max_angular_vel': 1.45},  # Max angular speed
+            {'max_linear_vel': 0.45},   # Max linear speed (for both X and Y)
+            {'max_angular_vel': 1.0},  # Max angular speed
             {'linear_axis': 1},        # Left Stick Vertical (Y-axis) -> linear.x (FWD/BWD)
             {'angular_axis': 3},       # Right Stick Horizontal (X-axis) -> angular.z (YAW)
             {'strafe_axis': 0},        # Left Stick Horizontal (X-axis) -> linear.y (Strafe) <-- UPDATED

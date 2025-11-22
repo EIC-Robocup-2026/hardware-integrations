@@ -69,6 +69,9 @@ void loop() {
         if (commandReceiver->getCommand(servoId, targetAngle)) {
             // Set new target for the servo
             setServoTarget(servoId, targetAngle);
+            if (DEBUG_SERIAL) {
+                Serial.printf("Command received: Servo %d -> Target Angle %.1f°\n", servoId, targetAngle);
+            }
         }
     }
     

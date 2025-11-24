@@ -1,0 +1,1 @@
+/home/ryu/hardware-integrations/demo_arm_ws/src/my_robot_moveit_config/launch/moveit_rviz.launch.py

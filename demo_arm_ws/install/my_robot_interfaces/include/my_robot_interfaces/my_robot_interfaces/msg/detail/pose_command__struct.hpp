@@ -1,0 +1,1 @@
+/home/ryu/hardware-integrations/demo_arm_ws/build/my_robot_interfaces/rosidl_generator_cpp/my_robot_interfaces/msg/detail/pose_command__struct.hpp

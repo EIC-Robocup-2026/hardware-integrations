@@ -1,0 +1,15 @@
+package.xml
+setup.cfg
+setup.py
+my_robot_commander_py/__init__.py
+my_robot_commander_py/commander_template.py
+my_robot_commander_py/test_moveit.py
+my_robot_commander_py/test_moveit2.py
+my_robot_commander_py.egg-info/PKG-INFO
+my_robot_commander_py.egg-info/SOURCES.txt
+my_robot_commander_py.egg-info/dependency_links.txt
+my_robot_commander_py.egg-info/entry_points.txt
+my_robot_commander_py.egg-info/requires.txt
+my_robot_commander_py.egg-info/top_level.txt
+my_robot_commander_py.egg-info/zip-safe
+resource/my_robot_commander_py

@@ -1,1 +1,0 @@
-/home/ryu/hardware-integrations/demo_arm_ws/build/my_robot_interfaces/rosidl_generator_c/my_robot_interfaces/msg/pose_command.h

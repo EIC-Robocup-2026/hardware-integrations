@@ -1,4 +1,0 @@
-[console_scripts]
-commander = my_robot_commander_py.commander_template:main
-test_moveit = my_robot_commander_py.test_moveit:main
-test_moveit2 = my_robot_commander_py.test_moveit2:main

@@ -1,1 +1,0 @@
-/home/ryu/hardware-integrations/demo_arm_ws/src/my_robot_interfaces/msg/PoseCommand.msg

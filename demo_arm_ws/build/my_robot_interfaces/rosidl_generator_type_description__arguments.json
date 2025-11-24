@@ -1,7 +1,0 @@
-{
-  "package_name": "my_robot_interfaces",
-  "output_dir": "/home/ryu/hardware-integrations/demo_arm_ws/build/my_robot_interfaces/rosidl_generator_type_description/my_robot_interfaces",
-  "idl_tuples": [
-    "/home/ryu/hardware-integrations/demo_arm_ws/build/my_robot_interfaces/rosidl_adapter/my_robot_interfaces:msg/PoseCommand.idl"
-  ]
-}
